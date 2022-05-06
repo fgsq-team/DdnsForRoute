@@ -73,12 +73,14 @@ public class DdnsService {
                 //判断解析值是否符合当前ip
                 DescribeSubDomainRecordsResponse.Record record = subDomainRecordsList.get(0);
                 if (!record.getValue().equals(pubIP) || !record.getType().equals("A") || !record.getRR().equals(subDomainName)) {//不相等,修改
+                    // 外网ip和解析的ip不一致
                     logger.info("修改解析记录：" + subDomainName + ":" + pubIP);
-                    boolean b = AliDdnsUtils.editDomainRecord(record.getRecordId(), subDomainName, pubIP);
-                    if (b) {
+                    boolean isSuccess = AliDdnsUtils.editDomainRecord(record.getRecordId(), subDomainName, pubIP);
+                    if (isSuccess) {
                         IP = pubIP;
                     }
                 } else {
+                    // 外网ip和解析的ip一致
                     IP = pubIP;
                 }
             }
