@@ -6,7 +6,11 @@ import okhttp3.*;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
-import java.io.IOException;
+import java.io.*;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 爬取openwrt 获取外网IP
@@ -15,45 +19,116 @@ public class OpenWrtPubIP implements GetIP {
 
     private static final Logger logger = Logger.getLogger(OpenWrtPubIP.class);
     String WrtIP = PropertiesUtil.getProperty("route.managerIP");
+
     String cookie = "d6a42c3d466e46d2d1ba67089ac20543";
 
+    public static String sendRequest(String urlParam, String requestType) {
+
+        HttpURLConnection con = null;
+
+        BufferedReader buffer = null;
+        StringBuffer resultBuffer = null;
+
+        try {
+            URL url = new URL(urlParam);
+            //得到连接对象
+            con = (HttpURLConnection) url.openConnection();
+            //设置请求类型
+            con.setRequestMethod(requestType);
+
+            //设置请求需要返回的数据类型和字符集类型
+            con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            con.setRequestProperty("User-Agent", "");
+            //允许写出
+            con.setDoOutput(true);
+            //允许读入
+            con.setDoInput(true);
+            //不使用缓存
+            con.setUseCaches(false);
+
+            con.addRequestProperty("luci_username", "root");
+            con.addRequestProperty("luci_password", "password");
+
+            //得到响应码
+            int responseCode = con.getResponseCode();
+
+//            if (responseCode == HttpURLConnection.HTTP_OK) {
+            //得到响应流
+            InputStream inputStream = con.getInputStream();
+            //将响应流转换成字符串
+            resultBuffer = new StringBuffer();
+            String line;
+            buffer = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+            while ((line = buffer.readLine()) != null) {
+                resultBuffer.append(line);
+            }
+            return resultBuffer.toString();
+//            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
     public String getWrtCookie() throws IOException {
+        logger.warn("WrtIP = " + WrtIP);
         String url = "http://" + WrtIP + "/cgi-bin/luci/";
-        OkHttpClient okHttpClient = new OkHttpClient()
-                .newBuilder().build();
 
-        FormBody.Builder builder = new FormBody.Builder()
-                .add("luci_username", PropertiesUtil.getProperty("route.username"))
-                .add("luci_password", PropertiesUtil.getProperty("route.password"));
+        URL temp = new URL(url);
 
-        RequestBody formBody = builder.build();
+        String host = temp.getHost();
+        String path = temp.getPath();
 
-        Request request = new Request.Builder()
-                .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
-                .addHeader("Content-Type", "application/x-www-form-urlencoded")
-                .addHeader("Origin", "http://" + WrtIP)
-                .addHeader("Accept-Encoding", "gzip, deflate")
-                .addHeader("Accept-Language", "zh-CN,zh;q=0.9")
-                .addHeader("Cache-Control", "max-age=0")
-                .addHeader("Connection", "keep-alive")
-                .addHeader("Host", WrtIP)
-                .addHeader("Upgrade-Insecure-Requests", "1")
-                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-                .url(url)
-                .post(formBody).build(); // 请求
-        Response execute = okHttpClient.newCall(request).execute();
-        Headers headers = execute.priorResponse().headers();
+        int port = temp.getPort() == -1 ? 80 : temp.getPort();
 
-        for (Pair<? extends String, ? extends String> header : headers) {
-            if (header.component1().equals("Set-Cookie")) {
-                String cookie = header.component2();
-                cookie = cookie.substring(cookie.indexOf("=") + 1, cookie.lastIndexOf(";"));
+        Socket socket = new Socket();
+        SocketAddress address = new InetSocketAddress(host, port);
+        socket.connect(address, 5000);
+
+        String data = "luci_username=" + PropertiesUtil.getProperty("route.username")
+                + "&luci_password=" + PropertiesUtil.getProperty("route.password");
+
+        String requestString = "POST " + path + " HTTP/1.1\r\n" +
+                "Content-Type: application/x-www-form-urlencoded\r\n" +
+                "Content-Length: " + data.length() + "\r\n" +
+                "\r\n" +
+                data;
+
+        InputStream is = socket.getInputStream();
+        OutputStream os = socket.getOutputStream();
+
+        os.write(requestString.getBytes());
+        os.flush();
+
+        BufferedInputStream streamReader = new BufferedInputStream(is);
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(streamReader, "utf-8"));
+        String line = null;
+        while (true) {
+            line = bufferedReader.readLine();
+            if (line == null || line.equals("")) {
+                logger.info("获取cookie失败");
+                try {
+                    os.close();
+                    is.close();
+                    socket.close();
+                } catch (Exception ignored) {
+                }
+                return null;
+            }
+            if (line.contains("Set-Cookie")) {
+                cookie = line.substring(line.indexOf("=") + 1, line.lastIndexOf(";"));
                 logger.info("cookie: " + cookie);
+                try {
+                    os.close();
+                    is.close();
+                    socket.close();
+                } catch (Exception ignored) {
+                }
                 return cookie;
             }
+
         }
-        logger.warn("获取cookie失败");
-        return null;
     }
 
     public String getIP(int flag) throws IOException {
@@ -95,6 +170,8 @@ public class OpenWrtPubIP implements GetIP {
         OpenWrtPubIP openWrtPubIP = new OpenWrtPubIP();
         String ip = openWrtPubIP.getIP(0);
         System.out.println("ip = " + ip);
+//        System.out.println("cookie = " + openWrtPubIP.getWrtCookie());
+
     }
 
 }
