@@ -21,6 +21,9 @@ public class DdnsService {
         } else if (routeType == 2) {   // 爬取openWrt
             logger.info("开始爬取openWrt");
             getIP = new OpenWrtPubIP();
+        }else if(routeType == 3){
+            logger.info("开始爬取爱快");
+            getIP = new IKuaiPubIP();
         }
     }
 

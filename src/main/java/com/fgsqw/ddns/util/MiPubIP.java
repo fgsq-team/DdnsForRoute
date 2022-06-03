@@ -24,9 +24,6 @@ public class MiPubIP implements GetIP {
                 .followRedirects(false)
                 .build();
 
-        StringBuffer sb = new StringBuffer("" + System.currentTimeMillis());
-        sb.insert(10, "_");
-        System.out.println("sb = " + sb);
         MIWIFIkey miwifIkey = new MIWIFIkey();
 
         FormBody.Builder builder = new FormBody.Builder()
