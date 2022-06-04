@@ -1,6 +1,5 @@
 package com.fgsqw.ddns.util;
 
-import kotlin.Pair;
 import net.sf.json.JSONObject;
 import okhttp3.*;
 import org.apache.commons.lang.StringUtils;
@@ -21,55 +20,6 @@ public class OpenWrtPubIP implements GetIP {
     String WrtIP = PropertiesUtil.getProperty("route.managerIP");
 
     String cookie = "d6a42c3d466e46d2d1ba67089ac20543";
-
-    public static String sendRequest(String urlParam, String requestType) {
-
-        HttpURLConnection con = null;
-
-        BufferedReader buffer = null;
-        StringBuffer resultBuffer = null;
-
-        try {
-            URL url = new URL(urlParam);
-            //得到连接对象
-            con = (HttpURLConnection) url.openConnection();
-            //设置请求类型
-            con.setRequestMethod(requestType);
-
-            //设置请求需要返回的数据类型和字符集类型
-            con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-            con.setRequestProperty("User-Agent", "");
-            //允许写出
-            con.setDoOutput(true);
-            //允许读入
-            con.setDoInput(true);
-            //不使用缓存
-            con.setUseCaches(false);
-
-            con.addRequestProperty("luci_username", "root");
-            con.addRequestProperty("luci_password", "password");
-
-            //得到响应码
-            int responseCode = con.getResponseCode();
-
-//            if (responseCode == HttpURLConnection.HTTP_OK) {
-            //得到响应流
-            InputStream inputStream = con.getInputStream();
-            //将响应流转换成字符串
-            resultBuffer = new StringBuffer();
-            String line;
-            buffer = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-            while ((line = buffer.readLine()) != null) {
-                resultBuffer.append(line);
-            }
-            return resultBuffer.toString();
-//            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return "";
-    }
 
     public String getWrtCookie() throws IOException {
         logger.warn("WrtIP = " + WrtIP);
@@ -102,12 +52,12 @@ public class OpenWrtPubIP implements GetIP {
         os.flush();
 
         BufferedInputStream streamReader = new BufferedInputStream(is);
-        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(streamReader, "utf-8"));
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(streamReader, StandardCharsets.UTF_8));
         String line = null;
         while (true) {
             line = bufferedReader.readLine();
             if (line == null || line.equals("")) {
-                logger.info("获取cookie失败");
+                logger.error("获取cookie失败");
                 try {
                     os.close();
                     is.close();
@@ -131,7 +81,7 @@ public class OpenWrtPubIP implements GetIP {
         }
     }
 
-    public String getIP(int flag) throws IOException {
+    public Map<String, String> getIP(int flag) throws IOException {
         String url = "http://" + WrtIP + "/cgi-bin/luci/admin/status/overview?status=1";
         OkHttpClient okHttpClient = new OkHttpClient()
                 .newBuilder().build();
@@ -144,7 +94,7 @@ public class OpenWrtPubIP implements GetIP {
         Response execute = okHttpClient.newCall(request).execute();
         String string = execute.body().string();
         if (StringUtils.isEmpty(string)) {
-            System.out.println("返回数据错误");
+            logger.error("返回数据错误");
             return null;
         }
 
@@ -162,13 +112,16 @@ public class OpenWrtPubIP implements GetIP {
         JSONObject wan = jsonObject.getJSONObject("wan");
         String ipaddr = wan.getString("ipaddr");
         logger.info("pubIP = " + ipaddr);
-        return ipaddr;
+
+        Map<String, String> pubIP = new HashMap<>();
+        pubIP.put("*", ipaddr);
+        return pubIP;
 
     }
 
     public static void main(String[] args) throws IOException {
         OpenWrtPubIP openWrtPubIP = new OpenWrtPubIP();
-        String ip = openWrtPubIP.getIP(0);
+        String ip = openWrtPubIP.getIP(0).get(0);
         System.out.println("ip = " + ip);
 //        System.out.println("cookie = " + openWrtPubIP.getWrtCookie());
 

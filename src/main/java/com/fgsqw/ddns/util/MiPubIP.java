@@ -7,6 +7,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
+import java.util.*;
 
 /**
  * 通过小米路由获取外网ip
@@ -62,7 +63,7 @@ public class MiPubIP implements GetIP {
 
 
     // 爬取IP
-    public String getIP(int flag) throws IOException {
+    public Map<String, String> getIP(int flag) throws IOException {
 
         String url = "http://" + managerIP + "/cgi-bin/luci/;stok=" + cookie + "/api/xqnetwork/wan_info";
         OkHttpClient okHttpClient = new OkHttpClient()
@@ -75,18 +76,18 @@ public class MiPubIP implements GetIP {
 
         Response execute = okHttpClient.newCall(request).execute();
 
-        String string = execute.body().string();
+        String string = Objects.requireNonNull(execute.body()).string();
         if (StringUtils.isEmpty(string)) {
-            logger.info("返回数据错误");
+            logger.error("返回数据错误");
             return null;
         }
         if (string.contains("Invalid token")) {
-            logger.info("cookie 获取失败");
+            logger.error("cookie 获取失败");
             if (flag == 1) {
                 return null;
             }
 
-            logger.info("cookie 失效重新登录");
+            logger.warn("cookie 失效重新登录");
             cookie = getCookie();
             return getIP(1);
         }
@@ -98,14 +99,16 @@ public class MiPubIP implements GetIP {
         String ip = ipv4JSONObject.getString("ip");
 
         logger.info("pubIP = " + ip);
-        return ip;
 
+        Map<String, String> pubIP = new HashMap<>();
+        pubIP.put("*", ip);
+        return pubIP;
     }
 
 
     public static void main(String[] args) throws IOException {
         GetIP miPubIP = new MiPubIP();
-        String ip = miPubIP.getIP(0);
+        String ip = miPubIP.getIP(0).get(0);
         System.out.println("ip = " + ip);
     }
 

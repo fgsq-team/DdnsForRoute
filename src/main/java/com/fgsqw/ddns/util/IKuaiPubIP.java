@@ -7,12 +7,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
+import java.util.*;
 
 public class IKuaiPubIP implements GetIP {
 
@@ -23,7 +18,7 @@ public class IKuaiPubIP implements GetIP {
 
 
     @Override
-    public String getIP(int flag) throws IOException {
+    public Map<String,String> getIP(int flag) throws IOException {
         String managerIP = "192.168.33.1";
 
         String url = "http://" + managerIP + "/Action/call";
@@ -52,48 +47,41 @@ public class IKuaiPubIP implements GetIP {
 
         String string = execute.body().string();
         if (StringUtils.isEmpty(string)) {
-            logger.info("返回数据错误");
+            logger.error("返回数据错误");
             return null;
         }
 
-        if (string.contains("no login authentication")) {
-            logger.info("cookie 获取失败");
+        JSONObject rel = JSONObject.fromObject(string);
+        int result = rel.getInt("Result");
+        if (result == 30000) {
+            logger.info("cookie 检验成功");
+            JSONObject info = rel.getJSONObject("Data");
+            JSONArray iface_check = info.getJSONArray("iface_check");
+            Map<String,String> pubIps = new HashMap<>();
+            for (int i = 0; i < iface_check.size(); i++) {
+                JSONObject data = iface_check.getJSONObject(i);
+                // adsl1 是自己设置的拨号名称 此处逻辑可以改成自己想要的
+//              if (data != null && data.getString("interface").startsWith("adsl")) {
+                pubIps.put(data.getString("interface"),data.getString("ip_addr"));
+//              }
+            }
+            return pubIps;
+        } else {
+            logger.error(" ErrMsg " + rel.getString("ErrMsg"));
+            // 账号或密码错误
+            if (result == 10014) {
+                logger.warn("cookie 失效");
+            }
+
             if (flag == 1) {
                 return null;
             }
-
-            logger.info("cookie 失效重新登录");
+            logger.warn("cookie 失效重新获取cookie");
             cookie = getCookie();
             return getIP(1);
         }
-
-        JSONObject jsonObject = JSONObject.fromObject(string);
-
-        JSONObject info = jsonObject.getJSONObject("Data");
-        JSONArray iface_check = info.getJSONArray("iface_check");
-        for (int i = 0; i < iface_check.size(); i++) {
-            JSONObject data = iface_check.getJSONObject(i);
-            // adsl1 是自己设置的拨号名称 此处逻辑可以改成自己想要的
-            if (data != null && data.getString("interface").equals("adsl1")) {
-                return data.getString("gateway");
-            }
-        }
-
-        return null;
     }
 
-
-    public static String md5(String str) {
-        byte[] digest = null;
-        try {
-            MessageDigest md5 = MessageDigest.getInstance("md5");
-            digest  = md5.digest(str.getBytes(StandardCharsets.UTF_8));
-            return new BigInteger(1, digest).toString(16);
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
 
     // 获取登录cookie
     public String getCookie() throws IOException {
@@ -112,7 +100,7 @@ public class IKuaiPubIP implements GetIP {
         JSONObject json = new JSONObject();
         json.put("pass", new String(Base64.getEncoder().encode(salt_password.getBytes())));
         json.put("remember_password", "");
-        json.put("passwd",  md5(password));
+        json.put("passwd", utils.md5(password));
         json.put("username", userName);
 
         Request request = new Request.Builder()
@@ -137,19 +125,20 @@ public class IKuaiPubIP implements GetIP {
         if (anInt == 10000) {
             Headers headers = execute.headers();
             String setCookie = headers.get("Set-Cookie");
-            if(!StringUtils.isEmpty(setCookie)){
+            if (!StringUtils.isEmpty(setCookie)) {
                 return setCookie.substring(setCookie.indexOf("=") + 1, setCookie.indexOf(";"));
             }
+        } else {
+            logger.error(" ErrMsg " + rel.getString("ErrMsg"));
         }
         return null;
     }
 
 
-//    public static void main(String[] args) throws IOException {
-//
-//        String cookie = new IKuaiPubIP().getCookie();
+    public static void main(String[] args) throws IOException {
+        new IKuaiPubIP().getIP(0);
 //        logger.info("pubIP = " + cookie);
-//    }
+    }
 
 
 }
