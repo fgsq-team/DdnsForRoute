@@ -7,6 +7,7 @@ import com.aliyuncs.exceptions.ClientException;
 import com.aliyuncs.exceptions.ServerException;
 import com.aliyuncs.profile.DefaultProfile;
 import com.aliyuncs.profile.IClientProfile;
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
 import java.util.ArrayList;
@@ -73,7 +74,8 @@ public class AliDdnsUtils {
         request.setDomainName(PropertiesUtil.getProperty("DomainName"));//设置主域名
         request.setRR(subDomain);//设置 子域名
         request.setType("A");//设置type 解析的是个IPV4
-        request.setTTL(60L);
+        String TTL = PropertiesUtil.getProperty("TTL");
+        request.setTTL(StringUtils.isEmpty(TTL) ? 600L : Long.parseLong(TTL));
         request.setValue(value);//设置 解析的地址
         try {
             AddDomainRecordResponse response = client.getAcsResponse(request);
@@ -121,7 +123,8 @@ public class AliDdnsUtils {
         request.setType("A");
         // 记录值  也就是IP
         request.setValue(value);
-        request.setTTL(60L);
+        String TTL = PropertiesUtil.getProperty("TTL");
+        request.setTTL(StringUtils.isEmpty(TTL) ? 600L : Long.parseLong(TTL));
         try {
             client.getAcsResponse(request);
             return true;
