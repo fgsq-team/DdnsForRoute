@@ -13,13 +13,12 @@ public class IKuaiPubIP implements GetIP {
 
     private static final Logger logger = Logger.getLogger(MiPubIP.class);
     private static final MediaType JSON = MediaType.parse("application/json;charset=utf-8");
-    String managerIP = PropertiesUtil.getProperty("route.managerIP");
-    String cookie = "d6a42c3d466e46d2d1ba67089ac20543";
+    private static final String managerIP = PropertiesUtil.getProperty("route.managerIP");
+    private String cookie = "d6a42c3d466e46d2d1ba67089ac20543";
 
 
     @Override
-    public Map<String,String> getIP(int flag) throws IOException {
-        String managerIP = "192.168.33.1";
+    public Map<String, String> getIP(int flag) throws IOException {
 
         String url = "http://" + managerIP + "/Action/call";
 
@@ -57,12 +56,12 @@ public class IKuaiPubIP implements GetIP {
             logger.info("cookie 检验成功");
             JSONObject info = rel.getJSONObject("Data");
             JSONArray iface_check = info.getJSONArray("iface_check");
-            Map<String,String> pubIps = new HashMap<>();
+            Map<String, String> pubIps = new HashMap<>();
             for (int i = 0; i < iface_check.size(); i++) {
                 JSONObject data = iface_check.getJSONObject(i);
                 // adsl1 是自己设置的拨号名称 此处逻辑可以改成自己想要的
 //              if (data != null && data.getString("interface").startsWith("adsl")) {
-                pubIps.put(data.getString("interface"),data.getString("ip_addr"));
+                pubIps.put(data.getString("interface"), data.getString("ip_addr"));
 //              }
             }
             return pubIps;
